@@ -1,14 +1,42 @@
-import Head from "next/head";
-import { useState } from "react";
-import styles from "../styles/Home.module.css";
+import Head from "next/head"
+import useSWR from "swr"
+import { useState } from "react"
+import styles from "../styles/Home.module.css"
+import { getFahrenheit, getLocalTime } from "../utils/weather"
 
 export default function Home() {
-  const [location, setLocation] = useState();
+  const fetcher = (url) => fetch(url).then((r) => r.json())
+  const [location, setLocation] = useState()
+  const [searching, setSearching] = useState(false)
+  const [params, setParams] = useState("")
+
+  const { data, error } = useSWR(
+    searching ? `/api/weather?${params}` : null,
+    fetcher
+  )
+
+  console.log(data)
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log(e.target);
-  };
+    e.preventDefault()
+    setSearching(true)
+
+    setParams(new URLSearchParams(parseSearchParams()).toString())
+  }
+
+  const handleChange = (e) => {
+    setLocation({ query: e.currentTarget.value })
+  }
+
+  const parseSearchParams = () => {
+    if (location) {
+      const query = location.query.split(",").map((el) => el.trim())
+      // To keep it simple, let's just search in ZIP Codes from the US
+      return query.length === 1 ? { q: query[0] } : { zip: `${query[1]},US` }
+    }
+
+    return false
+  }
 
   return (
     <div className={styles.container}>
@@ -34,11 +62,23 @@ export default function Home() {
               id="username"
               type="text"
               placeholder="Location, Zip Code"
-              onChange={(e) => setLocation({ location: e.currentTarget.value })}
+              onChange={(e) => handleChange(e)}
             ></input>
           </form>
         </div>
+
+        {searching && data?.cod == "200" ? (
+          <div className="text-center text-xl my-2">
+            <h2 className="text-3xl">📍 {data.name}</h2>
+            <p>Current temperature is: {getFahrenheit(data.main.temp)} F</p>
+            <p>Local time: {getLocalTime(data.dt, data.timezone)} UTC</p>
+          </div>
+        ) : (
+          <div>
+            <p className="text-xl text-red-500">{data?.message}</p>
+          </div>
+        )}
       </main>
     </div>
-  );
+  )
 }
